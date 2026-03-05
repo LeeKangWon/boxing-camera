@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>카메라</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: sans-serif;
+      color: #eee;
+    }
+    video {
+      width: 100%;
+      max-width: 640px;
+      border-radius: 12px;
+      border: 2px solid #e94560;
+    }
+    #status {
+      margin-top: 12px;
+      color: #a8dadc;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay playsinline muted></video>
+  <div id="status">카메라 초기화 중...</div>
+
+  <script>
+    const video  = document.getElementById('video');
+    const status = document.getElementById('status');
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+          audio: false
+        });
+        video.srcObject = stream;
+        status.textContent = '✅ 카메라 연결됨';
+        window.parent.postMessage({ type: 'CAMERA_READY' }, '*');
+      } catch (err) {
+        status.textContent = '❌ ' + err.message;
+        window.parent.postMessage({ type: 'CAMERA_ERROR', message: err.message }, '*');
+      }
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data?.type === 'PONG') {
+        status.textContent = '✅ 메인 연결 확인';
+      }
+    });
+
+    startCamera();
+  </script>
+</body>
+</html>
