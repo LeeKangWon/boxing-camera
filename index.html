@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>복싱 대기열 시스템</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Noto Sans KR', sans-serif;
+      padding: 24px;
+    }
+    h1 { color: #e94560; margin-bottom: 20px; font-size: 24px; }
+
+    .layout {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    /* 카메라 영역 */
+    #camera-wrap {
+      flex-shrink: 0;
+    }
+    video {
+      width: 400px;
+      border-radius: 12px;
+      border: 2px solid #0f3460;
+      display: block;
+    }
+    #cam-status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #a8dadc;
+      text-align: center;
+    }
+
+    /* 대기열 영역 */
+    #queue-wrap {
+      flex: 1;
+    }
+    #queue-list {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 200px;
+    }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #0f3460;
+      font-size: 15px;
+    }
+    .queue-item.active {
+      background: #e94560;
+      font-weight: bold;
+    }
+    .badge {
+      background: #e94560;
+      color: #fff;
+      border-radius: 50%;
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: bold; flex-shrink: 0;
+    }
+    .active .badge { background: #fff; color: #e94560; }
+
+    .btn-row {
+      display: flex; gap: 10px; margin-top: 14px;
+    }
+    button {
+      background: #e94560; color: #fff;
+      border: none; padding: 10px 20px;
+      border-radius: 8px; cursor: pointer; font-size: 14px;
+    }
+    button:hover { background: #c73652; }
+    button.secondary { background: #0f3460; }
+    button.secondary:hover { background: #1a4a8a; }
+
+    #status-box {
+      margin-top: 16px;
+      background: #16213e;
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: #a8dadc;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🥊 복싱 대기열 시스템</h1>
+
+  <div class="layout">
+
+    <!-- 카메라 -->
+    <div id="camera-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="cam-status">카메라 초기화 중...</div>
+    </div>
+
+    <!-- 대기열 -->
+    <div id="queue-wrap">
+      <div id="queue-list">
+        <div class="queue-item active">
+          <div class="badge">1</div> 홍길동 (현재)
+        </div>
+        <div class="queue-item">
+          <div class="badge">2</div> 김철수
+        </div>
+        <div class="queue-item">
+          <div class="badge">3</div> 이영희
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button onclick="nextQueue()">➡ 다음 순서</button>
+        <button class="secondary" onclick="loadQueue()">🔄 새로고침</button>
+      </div>
+
+      <div id="status-box">Apps Script 연결 대기 중...</div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── Apps Script 웹 앱 URL (배포 후 여기에 입력)
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzFfGAWoNC1MTHtAgMABXJ6Mfm6z5Tc32GYogcRsjQH/exec';
+
+    // ── 카메라 시작
+    async function startCamera() {
+      const video = document.getElementById('video');
+      const camStatus = document.getElementById('cam-status');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+          audio: false
+        });
+        video.srcObject = stream;
+        camStatus.textContent = '✅ 카메라 연결됨';
+      } catch (err) {
+        camStatus.textContent = '❌ ' + err.message;
+      }
+    }
+
+    // ── Apps Script에서 대기열 불러오기
+    async function loadQueue() {
+      const statusBox = document.getElementById('status-box');
+      try {
+        const res = await fetch(APPS_SCRIPT_URL + '?action=getQueue');
+        const data = await res.json();
+        statusBox.textContent = '✅ 대기열 로드 완료 (' + data.length + '명)';
+        renderQueue(data);
+      } catch (err) {
+        statusBox.textContent = '⚠️ Apps Script 연결 실패 (로컬 데이터 사용 중)';
+      }
+    }
+
+    // ── 대기열 렌더링
+    function renderQueue(list) {
+      const el = document.getElementById('queue-list');
+      el.innerHTML = list.map((name, i) => `
+        <div class="queue-item ${i === 0 ? 'active' : ''}">
+          <div class="badge">${i + 1}</div> ${name} ${i === 0 ? '(현재)' : ''}
+        </div>
+      `).join('');
+    }
+
+    // ── 다음 순서
+    async function nextQueue() {
+      try {
+        await fetch(APPS_SCRIPT_URL + '?action=next');
+        loadQueue();
+      } catch (err) {
+        document.getElementById('status-box').textContent = '⚠️ 연결 실패';
+      }
+    }
+
+    // ── 초기 실행
+    startCamera();
+    loadQueue();
+  </script>
+
+</body>
+</html>
